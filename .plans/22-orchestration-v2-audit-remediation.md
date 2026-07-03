@@ -26,7 +26,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] 8. Invisible post-turn wakeup turns (fix already on this branch — verify against audit scenarios)
 - [ ] 9. Route shared-codex-session native logs to the correct thread's file
 - [ ] 10. Coalesce streaming-delta event persistence (~2800x amplification)
-- [x] 11. Assistant text segments merged without separator (fixed in worktree — add regression fixture)
+- [x] 11. Assistant text segments merged without separator (fixed; regression fixture claude_text_segments added)
 - [x] 12. OpenCode `file_search` items drop error/output
 - [ ] 13. Low-severity backlog (see section)
 - [ ] 14. Cursor SDK unhandled `write EPIPE` crashes the backend child (recurring, post-SDK-bump) — reported upstream to Cursor, on hold
@@ -384,8 +384,8 @@ with no separator, ordered after all 19 tool calls, losing interleaving. Current
 **Remaining work:**
 
 - [x] Fix (already in worktree)
-- [ ] Add a replay fixture asserting multi-segment assistant text produces one item per SDK
-      uuid, interleaved with tool items at correct ordinals
+- [x] Replay fixture `claude_text_segments` asserts text → command → text ordering with one
+      assistant item per SDK uuid
 
 ## 12. OpenCode `file_search` items drop error/output
 
