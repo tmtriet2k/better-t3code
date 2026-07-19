@@ -57,6 +57,7 @@ import { flushSync } from "react-dom";
 import { useNavigate } from "@tanstack/react-router";
 import { useShallow } from "zustand/react/shallow";
 import {
+  executeAtomQuery,
   isAtomCommandInterrupted,
   mapAtomCommandResult,
   settlePromise,
@@ -183,6 +184,8 @@ import { environmentCatalog } from "../connection/catalog";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { useKnownTerminalSessions, useThreadRunningTerminalIds } from "../state/terminalSessions";
 import { projectEnvironment } from "../state/projects";
+import { getProjectFileQueryAtom } from "./files/projectFilesQueryState";
+import { appAtomRegistry } from "../rpc/atomRegistry";
 import { useEnvironmentQuery } from "../state/query";
 import {
   primaryServerAvailableEditorsAtom,
@@ -1102,6 +1105,10 @@ function ChatViewContent(props: ChatViewProps) {
   const updateThreadMetadata = useAtomCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
+  const createSpecWorktree = useAtomCommand(vcsEnvironment.createWorktree, {
+    reportFailure: false,
+  });
+  const writeSpecFile = useAtomCommand(projectEnvironment.writeFile, { reportFailure: false });
   const setThreadRuntimeMode = useAtomCommand(threadEnvironment.setRuntimeMode, {
     reportFailure: false,
   });
@@ -3752,6 +3759,101 @@ function ChatViewContent(props: ChatViewProps) {
     isGitRepo,
   });
 
+  const [addSpecPending, setAddSpecPending] = useState(false);
+  const handleAddSpec = useCallback(async () => {
+    if (addSpecPending || !isServerThread || !serverThread || !activeProject) return;
+    const SPEC_RELATIVE_PATH = "spec.md";
+    setAddSpecPending(true);
+    try {
+      let worktreePath = serverThread.worktreePath;
+      // Draft thread: create a worktree and persist it onto the thread first.
+      if (worktreePath === null) {
+        if (!activeThreadBranch) {
+          setThreadError(serverThread.id, "Select a base branch before adding a spec.");
+          return;
+        }
+        const worktreeResult = await createSpecWorktree({
+          environmentId,
+          input: {
+            cwd: activeProject.workspaceRoot,
+            refName: activeThreadBranch,
+            newRefName: buildTemporaryWorktreeBranchName(randomHex),
+            baseRefName: activeThreadBranch,
+            path: null,
+          },
+        });
+        if (worktreeResult._tag === "Failure") {
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: "Could not create worktree",
+              description: "Failed to prepare a worktree for the spec.",
+            }),
+          );
+          return;
+        }
+        worktreePath = worktreeResult.value.worktree.path;
+        const metaResult = await updateThreadMetadata({
+          environmentId,
+          input: {
+            threadId: serverThread.id,
+            branch: worktreeResult.value.worktree.refName,
+            worktreePath,
+          },
+        });
+        if (metaResult._tag === "Failure") {
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: "Could not update thread",
+              description: "The worktree was created but the thread could not be updated.",
+            }),
+          );
+          return;
+        }
+      }
+
+      // Only create spec.md when it does not already exist (no overwrite).
+      const existing = await executeAtomQuery(
+        appAtomRegistry,
+        getProjectFileQueryAtom(environmentId, worktreePath, SPEC_RELATIVE_PATH),
+        { reportDefect: false, reportFailure: false },
+      );
+      if (existing._tag !== "Success") {
+        const writeResult = await writeSpecFile({
+          environmentId,
+          input: { cwd: worktreePath, relativePath: SPEC_RELATIVE_PATH, contents: "# Spec\n" },
+        });
+        if (writeResult._tag === "Failure") {
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: "Could not create spec",
+              description: "Failed to write spec.md to the worktree.",
+            }),
+          );
+          return;
+        }
+      }
+
+      openFileSurface(SPEC_RELATIVE_PATH);
+    } finally {
+      setAddSpecPending(false);
+    }
+  }, [
+    addSpecPending,
+    activeProject,
+    activeThreadBranch,
+    createSpecWorktree,
+    environmentId,
+    isServerThread,
+    openFileSurface,
+    serverThread,
+    setThreadError,
+    updateThreadMetadata,
+    writeSpecFile,
+  ]);
+
   useEffect(() => {
     setPendingServerThreadEnvMode(null);
     setPendingServerThreadBranch(undefined);
@@ -5240,6 +5342,8 @@ function ChatViewContent(props: ChatViewProps) {
             availableEditors={availableEditors}
             rightPanelOpen={rightPanelOpen}
             gitCwd={gitCwd}
+            addSpecPending={addSpecPending}
+            {...(isServerThread && activeProject ? { onAddSpec: handleAddSpec } : {})}
             onRunProjectScript={runProjectScript}
             onAddProjectScript={saveProjectScript}
             onUpdateProjectScript={updateProjectScript}

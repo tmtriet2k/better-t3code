@@ -17,6 +17,7 @@ import ProjectScriptsControl, {
 import { OpenInPicker } from "./OpenInPicker";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { cn } from "~/lib/utils";
+import { AddSpecButton } from "../AddSpecButton";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
@@ -31,6 +32,8 @@ interface ChatHeaderProps {
   availableEditors: ReadonlyArray<EditorId>;
   rightPanelOpen: boolean;
   gitCwd: string | null;
+  addSpecPending?: boolean;
+  onAddSpec?: () => void;
   onRunProjectScript: (script: ProjectScript) => void;
   onAddProjectScript: (input: NewProjectScriptInput) => Promise<ProjectScriptActionResult>;
   onUpdateProjectScript: (
@@ -65,6 +68,8 @@ export const ChatHeader = memo(function ChatHeader({
   availableEditors,
   rightPanelOpen,
   gitCwd,
+  addSpecPending,
+  onAddSpec,
   onRunProjectScript,
   onAddProjectScript,
   onUpdateProjectScript,
@@ -100,6 +105,7 @@ export const ChatHeader = memo(function ChatHeader({
           rightPanelOpen ? "pr-0" : "pr-16",
         )}
       >
+        {onAddSpec && <AddSpecButton onClick={onAddSpec} pending={addSpecPending ?? false} />}
         {activeProjectScripts && (
           <ProjectScriptsControl
             scripts={activeProjectScripts}
