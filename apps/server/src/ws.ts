@@ -935,6 +935,8 @@ const makeWsRpcLayer = (
             otlpMetricsEnabled: config.otlpMetricsUrl !== undefined,
           },
           settings,
+          shellResumeCompletionMarker: true,
+          threadResumeCompletionMarker: true,
         };
       });
 
@@ -1104,11 +1106,28 @@ const makeWsRpcLayer = (
                             }),
                         ),
                       );
-                    return Stream.concat(catchUpStream, Stream.fromQueue(liveBuffer));
+                    const afterCatchUp =
+                      input.requestCompletionMarker === true
+                        ? Stream.concat(
+                            Stream.fromEffect(
+                              Queue.offer(liveBuffer, { kind: "synchronized" as const }),
+                            ).pipe(Stream.drain),
+                            Stream.fromQueue(liveBuffer),
+                          )
+                        : Stream.fromQueue(liveBuffer);
+                    return Stream.concat(catchUpStream, afterCatchUp);
                   }),
                 );
               }
 
+              // The full-snapshot fallback needs the same replay-window safety
+              // as the resume path: subscribe before loading the projection so
+              // events published while the snapshot is read are buffered.
+              const liveBuffer = yield* Queue.unbounded<OrchestrationShellStreamItem>();
+              yield* Effect.forkScoped(
+                liveStream.pipe(Stream.runForEach((item) => Queue.offer(liveBuffer, item))),
+              );
+              const bufferedLiveStream = Stream.fromQueue(liveBuffer);
               const snapshot = yield* projectionSnapshotQuery.getShellSnapshot().pipe(
                 Effect.tapError((cause) =>
                   Effect.logError("orchestration shell snapshot load failed", { cause }),
@@ -1122,12 +1141,21 @@ const makeWsRpcLayer = (
                 ),
               );
 
+              const afterSnapshot =
+                input.requestCompletionMarker === true
+                  ? Stream.concat(
+                      Stream.fromEffect(
+                        Queue.offer(liveBuffer, { kind: "synchronized" as const }),
+                      ).pipe(Stream.drain),
+                      bufferedLiveStream,
+                    )
+                  : bufferedLiveStream;
               return Stream.concat(
                 Stream.make({
                   kind: "snapshot" as const,
                   snapshot,
                 }),
-                liveStream,
+                afterSnapshot,
               );
             }),
             { "rpc.aggregate": "orchestration" },
@@ -1206,7 +1234,16 @@ const makeWsRpcLayer = (
                         }),
                     ),
                   );
-                return Stream.concat(catchUpStream, bufferedLiveStream);
+                const afterCatchUp =
+                  input.requestCompletionMarker === true
+                    ? Stream.concat(
+                        Stream.fromEffect(
+                          Queue.offer(liveBuffer, { kind: "synchronized" as const }),
+                        ).pipe(Stream.drain),
+                        bufferedLiveStream,
+                      )
+                    : bufferedLiveStream;
+                return Stream.concat(catchUpStream, afterCatchUp);
               }
 
               const snapshot = yield* projectionSnapshotQuery
@@ -1228,12 +1265,21 @@ const makeWsRpcLayer = (
                 });
               }
 
+              const afterSnapshot =
+                input.requestCompletionMarker === true
+                  ? Stream.concat(
+                      Stream.fromEffect(
+                        Queue.offer(liveBuffer, { kind: "synchronized" as const }),
+                      ).pipe(Stream.drain),
+                      bufferedLiveStream,
+                    )
+                  : bufferedLiveStream;
               return Stream.concat(
                 Stream.make({
                   kind: "snapshot" as const,
                   snapshot: snapshot.value,
                 }),
-                bufferedLiveStream,
+                afterSnapshot,
               );
             }),
             { "rpc.aggregate": "orchestration" },
