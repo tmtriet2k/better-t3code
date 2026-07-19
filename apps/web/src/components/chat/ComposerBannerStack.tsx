@@ -101,6 +101,43 @@ export function ComposerBannerStack({ className, items }: ComposerBannerStackPro
             aria-hidden="true"
           />
         ) : null}
+        {hasStack ? (
+          <div
+            data-composer-banner-stack-expanded-items="true"
+            className={cn(
+              "grid grid-rows-[0fr] transition-[grid-template-rows] duration-150 ease-out",
+              "group-hover/banner-stack:grid-rows-[1fr] group-focus-within/banner-stack:grid-rows-[1fr]",
+            )}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div
+                className={cn(
+                  "pointer-events-none space-y-2 pb-2 opacity-0",
+                  "translate-y-1 transform-gpu transition-[opacity,transform] duration-150 ease-out will-change-[opacity,transform]",
+                  "group-hover/banner-stack:pointer-events-auto group-hover/banner-stack:translate-y-0 group-hover/banner-stack:opacity-100",
+                  "group-focus-within/banner-stack:pointer-events-auto group-focus-within/banner-stack:translate-y-0 group-focus-within/banner-stack:opacity-100",
+                )}
+              >
+                {stackedItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className={cn(exitingItemId === item.id ? "pointer-events-none" : null)}
+                    style={{
+                      ...exitTransitionStyle,
+                      ...(exitingItemId === item.id ? stackedExitStyle : restingStyle),
+                    }}
+                  >
+                    <ComposerBannerStackAlert
+                      item={item}
+                      exiting={exitingItemId === item.id}
+                      onDismissRequest={() => requestDismiss(item)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
         <div
           className={cn(
             "relative z-10",
@@ -117,34 +154,6 @@ export function ComposerBannerStack({ className, items }: ComposerBannerStackPro
             onDismissRequest={() => requestDismiss(frontItem)}
           />
         </div>
-        {hasStack ? (
-          <div
-            className={cn(
-              "pointer-events-none absolute inset-x-0 bottom-[calc(100%+0.5rem)] z-20 space-y-2 opacity-0",
-              "transition-[opacity,transform] duration-150 ease-out",
-              "translate-y-1 transform-gpu will-change-[opacity,transform]",
-              "group-hover/banner-stack:pointer-events-auto group-hover/banner-stack:translate-y-0 group-hover/banner-stack:opacity-100",
-              "group-focus-within/banner-stack:pointer-events-auto group-focus-within/banner-stack:translate-y-0 group-focus-within/banner-stack:opacity-100",
-            )}
-          >
-            {stackedItems.map((item) => (
-              <div
-                key={item.id}
-                className={cn(exitingItemId === item.id ? "pointer-events-none" : null)}
-                style={{
-                  ...exitTransitionStyle,
-                  ...(exitingItemId === item.id ? stackedExitStyle : restingStyle),
-                }}
-              >
-                <ComposerBannerStackAlert
-                  item={item}
-                  exiting={exitingItemId === item.id}
-                  onDismissRequest={() => requestDismiss(item)}
-                />
-              </div>
-            ))}
-          </div>
-        ) : null}
       </div>
     </div>
   );
