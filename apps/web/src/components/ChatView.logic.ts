@@ -1,4 +1,5 @@
 import {
+  type AutoPickupState,
   type EnvironmentId,
   isProviderDriverKind,
   ProjectId,
@@ -39,6 +40,8 @@ export function buildLocalDraftThread(
     title: "New thread",
     modelSelection: fallbackModelSelection,
     runtimeMode: draftThread.runtimeMode,
+    autoPickupState: null,
+    autoPickedUpAt: null,
     interactionMode: draftThread.interactionMode,
     session: null,
     messages: [],
@@ -53,6 +56,16 @@ export function buildLocalDraftThread(
     activities: [],
     proposedPlans: [],
   };
+}
+
+export function buildSpecRelativePath(threadId: ThreadId): string {
+  return `specs/${threadId}.md`;
+}
+
+export function resolveNextAutoPickupState(
+  current: AutoPickupState | null,
+): AutoPickupState | null {
+  return current === "queued" ? null : "queued";
 }
 
 export function shouldWriteThreadErrorToCurrentServerThread(input: {

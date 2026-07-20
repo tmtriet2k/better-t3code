@@ -361,6 +361,19 @@ export const ObservabilitySettings = Schema.Struct({
 });
 export type ObservabilitySettings = typeof ObservabilitySettings.Type;
 
+export const DEFAULT_AUTO_PICKUP_USAGE_THRESHOLD_PERCENT = 50;
+export const DEFAULT_AUTO_PICKUP_INTERVAL_MINUTES = 10;
+
+export const AutoPickupSettings = Schema.Struct({
+  usageThresholdPercent: Schema.Number.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_AUTO_PICKUP_USAGE_THRESHOLD_PERCENT)),
+  ),
+  intervalMinutes: Schema.Number.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_AUTO_PICKUP_INTERVAL_MINUTES)),
+  ),
+});
+export type AutoPickupSettings = typeof AutoPickupSettings.Type;
+
 export const DEFAULT_AUTOMATIC_GIT_FETCH_INTERVAL = Duration.seconds(30);
 
 export const ServerSettings = Schema.Struct({
@@ -409,6 +422,7 @@ export const ServerSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
   observability: ObservabilitySettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+  autoPickup: AutoPickupSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
 });
 export type ServerSettings = typeof ServerSettings.Type;
 

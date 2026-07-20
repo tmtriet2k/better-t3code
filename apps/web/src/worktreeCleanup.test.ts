@@ -17,6 +17,8 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
       model: "gpt-5.3-codex",
     },
     runtimeMode: DEFAULT_RUNTIME_MODE,
+    autoPickupState: null,
+    autoPickedUpAt: null,
     interactionMode: DEFAULT_INTERACTION_MODE,
     session: null,
     messages: [],

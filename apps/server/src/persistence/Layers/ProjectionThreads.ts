@@ -36,6 +36,8 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
           title,
           model_selection_json,
           runtime_mode,
+          auto_pickup_state,
+          auto_picked_up_at,
           interaction_mode,
           branch,
           worktree_path,
@@ -55,6 +57,8 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
           ${row.title},
           ${JSON.stringify(row.modelSelection)},
           ${row.runtimeMode},
+          ${row.autoPickupState},
+          ${row.autoPickedUpAt},
           ${row.interactionMode},
           ${row.branch},
           ${row.worktreePath},
@@ -74,6 +78,8 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
           title = excluded.title,
           model_selection_json = excluded.model_selection_json,
           runtime_mode = excluded.runtime_mode,
+          auto_pickup_state = excluded.auto_pickup_state,
+          auto_picked_up_at = excluded.auto_picked_up_at,
           interaction_mode = excluded.interaction_mode,
           branch = excluded.branch,
           worktree_path = excluded.worktree_path,
@@ -100,6 +106,8 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
           title,
           model_selection_json AS "modelSelection",
           runtime_mode AS "runtimeMode",
+          auto_pickup_state AS "autoPickupState",
+          auto_picked_up_at AS "autoPickedUpAt",
           interaction_mode AS "interactionMode",
           branch,
           worktree_path AS "worktreePath",
@@ -128,6 +136,8 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
           title,
           model_selection_json AS "modelSelection",
           runtime_mode AS "runtimeMode",
+          auto_pickup_state AS "autoPickupState",
+          auto_picked_up_at AS "autoPickedUpAt",
           interaction_mode AS "interactionMode",
           branch,
           worktree_path AS "worktreePath",
@@ -142,6 +152,39 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
           deleted_at AS "deletedAt"
         FROM projection_threads
         WHERE project_id = ${projectId}
+        ORDER BY created_at ASC, thread_id ASC
+      `,
+  });
+
+  const listQueuedForAutoPickupRows = SqlSchema.findAll({
+    Request: Schema.Void,
+    Result: ProjectionThreadDbRow,
+    execute: () =>
+      sql`
+        SELECT
+          thread_id AS "threadId",
+          project_id AS "projectId",
+          title,
+          model_selection_json AS "modelSelection",
+          runtime_mode AS "runtimeMode",
+          auto_pickup_state AS "autoPickupState",
+          auto_picked_up_at AS "autoPickedUpAt",
+          interaction_mode AS "interactionMode",
+          branch,
+          worktree_path AS "worktreePath",
+          latest_turn_id AS "latestTurnId",
+          created_at AS "createdAt",
+          updated_at AS "updatedAt",
+          archived_at AS "archivedAt",
+          latest_user_message_at AS "latestUserMessageAt",
+          pending_approval_count AS "pendingApprovalCount",
+          pending_user_input_count AS "pendingUserInputCount",
+          has_actionable_proposed_plan AS "hasActionableProposedPlan",
+          deleted_at AS "deletedAt"
+        FROM projection_threads
+        WHERE auto_pickup_state = 'queued'
+          AND archived_at IS NULL
+          AND deleted_at IS NULL
         ORDER BY created_at ASC, thread_id ASC
       `,
   });
@@ -170,6 +213,13 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
       Effect.mapError(toPersistenceSqlError("ProjectionThreadRepository.listByProjectId:query")),
     );
 
+  const listQueuedForAutoPickup: ProjectionThreadRepositoryShape["listQueuedForAutoPickup"] = () =>
+    listQueuedForAutoPickupRows().pipe(
+      Effect.mapError(
+        toPersistenceSqlError("ProjectionThreadRepository.listQueuedForAutoPickup:query"),
+      ),
+    );
+
   const deleteById: ProjectionThreadRepositoryShape["deleteById"] = (input) =>
     deleteProjectionThreadRow(input).pipe(
       Effect.mapError(toPersistenceSqlError("ProjectionThreadRepository.deleteById:query")),
@@ -179,6 +229,7 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
     upsert,
     getById,
     listByProjectId,
+    listQueuedForAutoPickup,
     deleteById,
   } satisfies ProjectionThreadRepositoryShape;
 });

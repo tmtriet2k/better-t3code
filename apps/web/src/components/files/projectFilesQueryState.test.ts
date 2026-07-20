@@ -48,4 +48,19 @@ describe("project files queries", () => {
       confirmProjectFileQueryData(environmentId, "/repo", "convex.json", '{"nodeVersion":"22"}'),
     ).toBe(true);
   });
+
+  it("makes freshly written file contents readable immediately, before the refetch resolves", () => {
+    vi.stubGlobal("window", {});
+    setProjectFileQueryData(environmentId, "/repo", "convex.json", "# Spec\n");
+
+    expect(getOptimisticProjectFileQueryData(environmentId, "/repo", "convex.json")?.contents).toBe(
+      "# Spec\n",
+    );
+    expect(confirmProjectFileQueryData(environmentId, "/repo", "convex.json", "# Spec\n")).toBe(
+      true,
+    );
+    expect(getOptimisticProjectFileQueryData(environmentId, "/repo", "convex.json")?.contents).toBe(
+      "# Spec\n",
+    );
+  });
 });

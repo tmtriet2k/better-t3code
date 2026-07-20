@@ -5,6 +5,7 @@ import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Scope from "effect/Scope";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
+import { AutoPickupReactor } from "../Services/AutoPickupReactor.ts";
 import { CheckpointReactor } from "../Services/CheckpointReactor.ts";
 import { ProviderCommandReactor } from "../Services/ProviderCommandReactor.ts";
 import { ProviderRuntimeIngestionService } from "../Services/ProviderRuntimeIngestion.ts";
@@ -73,6 +74,14 @@ describe("OrchestrationReactor", () => {
             },
           }),
         ),
+        Layer.provideMerge(
+          Layer.succeed(AutoPickupReactor, {
+            start: () => {
+              started.push("auto-pickup-reactor");
+              return Effect.void;
+            },
+          }),
+        ),
       ),
     );
 
@@ -86,6 +95,7 @@ describe("OrchestrationReactor", () => {
       "checkpoint-reactor",
       "thread-deletion-reactor",
       "agent-awareness-relay",
+      "auto-pickup-reactor",
     ]);
 
     await Effect.runPromise(Scope.close(scope, Exit.void));

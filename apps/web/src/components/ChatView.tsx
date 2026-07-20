@@ -184,7 +184,11 @@ import { environmentCatalog } from "../connection/catalog";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { useKnownTerminalSessions, useThreadRunningTerminalIds } from "../state/terminalSessions";
 import { projectEnvironment } from "../state/projects";
-import { getProjectFileQueryAtom } from "./files/projectFilesQueryState";
+import {
+  confirmProjectFileQueryData,
+  getProjectFileQueryAtom,
+  setProjectFileQueryData,
+} from "./files/projectFilesQueryState";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { useEnvironmentQuery } from "../state/query";
 import {
@@ -229,6 +233,7 @@ import {
   MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
   buildExpiredTerminalContextToastCopy,
   buildLocalDraftThread,
+  buildSpecRelativePath,
   buildThreadTurnInterruptInput,
   collectUserMessageBlobPreviewUrls,
   createLocalDispatchSnapshot,
@@ -243,6 +248,7 @@ import {
   deriveLockedProvider,
   readFileAsDataUrl,
   reconcileMountedTerminalThreadIds,
+  resolveNextAutoPickupState,
   resolveSendEnvMode,
   revokeBlobPreviewUrl,
   revokeUserMessagePreviewUrls,
@@ -1110,6 +1116,9 @@ function ChatViewContent(props: ChatViewProps) {
   });
   const writeSpecFile = useAtomCommand(projectEnvironment.writeFile, { reportFailure: false });
   const setThreadRuntimeMode = useAtomCommand(threadEnvironment.setRuntimeMode, {
+    reportFailure: false,
+  });
+  const setThreadAutoPickup = useAtomCommand(threadEnvironment.setAutoPickup, {
     reportFailure: false,
   });
   const setThreadInteractionMode = useAtomCommand(threadEnvironment.setInteractionMode, {
@@ -3762,7 +3771,7 @@ function ChatViewContent(props: ChatViewProps) {
   const [addSpecPending, setAddSpecPending] = useState(false);
   const handleAddSpec = useCallback(async () => {
     if (addSpecPending || !isServerThread || !serverThread || !activeProject) return;
-    const SPEC_RELATIVE_PATH = "spec.md";
+    const SPEC_RELATIVE_PATH = buildSpecRelativePath(serverThread.id);
     setAddSpecPending(true);
     try {
       let worktreePath = serverThread.worktreePath;
@@ -3820,9 +3829,10 @@ function ChatViewContent(props: ChatViewProps) {
         { reportDefect: false, reportFailure: false },
       );
       if (existing._tag !== "Success") {
+        const specContents = "# Spec\n";
         const writeResult = await writeSpecFile({
           environmentId,
-          input: { cwd: worktreePath, relativePath: SPEC_RELATIVE_PATH, contents: "# Spec\n" },
+          input: { cwd: worktreePath, relativePath: SPEC_RELATIVE_PATH, contents: specContents },
         });
         if (writeResult._tag === "Failure") {
           toastManager.add(
@@ -3834,6 +3844,8 @@ function ChatViewContent(props: ChatViewProps) {
           );
           return;
         }
+        setProjectFileQueryData(environmentId, worktreePath, SPEC_RELATIVE_PATH, specContents);
+        confirmProjectFileQueryData(environmentId, worktreePath, SPEC_RELATIVE_PATH, specContents);
       }
 
       openFileSurface(SPEC_RELATIVE_PATH);
@@ -3852,6 +3864,46 @@ function ChatViewContent(props: ChatViewProps) {
     setThreadError,
     updateThreadMetadata,
     writeSpecFile,
+  ]);
+
+  const autoPickupWorktreePath = serverThread?.worktreePath ?? null;
+  const autoPickupSpecRelativePath = serverThread ? buildSpecRelativePath(serverThread.id) : null;
+  const autoPickupSpecFileQuery = useEnvironmentQuery(
+    autoPickupWorktreePath !== null && autoPickupSpecRelativePath !== null
+      ? getProjectFileQueryAtom(environmentId, autoPickupWorktreePath, autoPickupSpecRelativePath)
+      : null,
+  );
+  const autoPickupSpecAvailable = autoPickupSpecFileQuery.data !== null;
+
+  const [autoPickupPending, setAutoPickupPending] = useState(false);
+  const handleToggleAutoPickup = useCallback(async () => {
+    if (autoPickupPending || !isServerThread || !serverThread || !autoPickupSpecAvailable) return;
+    setAutoPickupPending(true);
+    try {
+      const nextAutoPickupState = resolveNextAutoPickupState(serverThread.autoPickupState);
+      const result = await setThreadAutoPickup({
+        environmentId,
+        input: { threadId: serverThread.id, autoPickupState: nextAutoPickupState },
+      });
+      if (result._tag === "Failure") {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "Could not update auto-pickup",
+            description: "Failed to update the auto-pickup queue for this thread.",
+          }),
+        );
+      }
+    } finally {
+      setAutoPickupPending(false);
+    }
+  }, [
+    autoPickupPending,
+    autoPickupSpecAvailable,
+    environmentId,
+    isServerThread,
+    serverThread,
+    setThreadAutoPickup,
   ]);
 
   useEffect(() => {
@@ -5344,6 +5396,13 @@ function ChatViewContent(props: ChatViewProps) {
             gitCwd={gitCwd}
             addSpecPending={addSpecPending}
             {...(isServerThread && activeProject ? { onAddSpec: handleAddSpec } : {})}
+            autoPickupState={serverThread?.autoPickupState ?? null}
+            autoPickedUpAt={serverThread?.autoPickedUpAt ?? null}
+            autoPickupSpecAvailable={autoPickupSpecAvailable}
+            autoPickupPending={autoPickupPending}
+            {...(isServerThread && activeProject
+              ? { onToggleAutoPickup: handleToggleAutoPickup }
+              : {})}
             onRunProjectScript={runProjectScript}
             onAddProjectScript={saveProjectScript}
             onUpdateProjectScript={updateProjectScript}

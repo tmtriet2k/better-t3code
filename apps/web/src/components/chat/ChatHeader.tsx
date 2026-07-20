@@ -1,4 +1,5 @@
 import {
+  type AutoPickupState,
   type EnvironmentId,
   type EditorId,
   type ProjectScript,
@@ -18,6 +19,7 @@ import { OpenInPicker } from "./OpenInPicker";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { cn } from "~/lib/utils";
 import { AddSpecButton } from "../AddSpecButton";
+import { AutoPickupToggle } from "../AutoPickupToggle";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
@@ -34,6 +36,11 @@ interface ChatHeaderProps {
   gitCwd: string | null;
   addSpecPending?: boolean;
   onAddSpec?: () => void;
+  autoPickupState?: AutoPickupState | null;
+  autoPickedUpAt?: string | null;
+  autoPickupSpecAvailable?: boolean;
+  autoPickupPending?: boolean;
+  onToggleAutoPickup?: () => void;
   onRunProjectScript: (script: ProjectScript) => void;
   onAddProjectScript: (input: NewProjectScriptInput) => Promise<ProjectScriptActionResult>;
   onUpdateProjectScript: (
@@ -70,6 +77,11 @@ export const ChatHeader = memo(function ChatHeader({
   gitCwd,
   addSpecPending,
   onAddSpec,
+  autoPickupState,
+  autoPickedUpAt,
+  autoPickupSpecAvailable,
+  autoPickupPending,
+  onToggleAutoPickup,
   onRunProjectScript,
   onAddProjectScript,
   onUpdateProjectScript,
@@ -106,6 +118,15 @@ export const ChatHeader = memo(function ChatHeader({
         )}
       >
         {onAddSpec && <AddSpecButton onClick={onAddSpec} pending={addSpecPending ?? false} />}
+        {onToggleAutoPickup && (
+          <AutoPickupToggle
+            autoPickupState={autoPickupState ?? null}
+            autoPickedUpAt={autoPickedUpAt ?? null}
+            disabled={!autoPickupSpecAvailable}
+            pending={autoPickupPending ?? false}
+            onToggle={onToggleAutoPickup}
+          />
+        )}
         {activeProjectScripts && (
           <ProjectScriptsControl
             scripts={activeProjectScripts}

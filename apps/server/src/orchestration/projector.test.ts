@@ -82,6 +82,8 @@ describe("orchestration projector", () => {
           model: "gpt-5-codex",
         },
         runtimeMode: "full-access",
+        autoPickupState: null,
+        autoPickedUpAt: null,
         interactionMode: "default",
         branch: null,
         worktreePath: null,
@@ -393,6 +395,114 @@ describe("orchestration projector", () => {
 
     expect(afterUpdate.threads[0]?.runtimeMode).toBe("approval-required");
     expect(afterUpdate.threads[0]?.updatedAt).toBe(updatedAt);
+  });
+
+  it("updates canonical thread auto-pickup state from thread.auto-pickup-set", async () => {
+    const createdAt = "2026-02-23T08:00:00.000Z";
+    const queuedAt = "2026-02-23T08:00:05.000Z";
+    const pickedAt = "2026-02-23T08:00:10.000Z";
+    const requeuedAt = "2026-02-23T08:00:15.000Z";
+    const model = createEmptyReadModel(createdAt);
+
+    const afterCreate = await Effect.runPromise(
+      projectEvent(
+        model,
+        makeEvent({
+          sequence: 1,
+          type: "thread.created",
+          aggregateKind: "thread",
+          aggregateId: "thread-1",
+          occurredAt: createdAt,
+          commandId: "cmd-create",
+          payload: {
+            threadId: "thread-1",
+            projectId: "project-1",
+            title: "demo",
+            modelSelection: {
+              provider: ProviderDriverKind.make("codex"),
+              model: "gpt-5.3-codex",
+            },
+            runtimeMode: "full-access",
+            branch: null,
+            worktreePath: null,
+            createdAt,
+            updatedAt: createdAt,
+          },
+        }),
+      ),
+    );
+
+    expect(afterCreate.threads[0]?.autoPickupState).toBeNull();
+    expect(afterCreate.threads[0]?.autoPickedUpAt).toBeNull();
+
+    const afterQueue = await Effect.runPromise(
+      projectEvent(
+        afterCreate,
+        makeEvent({
+          sequence: 2,
+          type: "thread.auto-pickup-set",
+          aggregateKind: "thread",
+          aggregateId: "thread-1",
+          occurredAt: queuedAt,
+          commandId: "cmd-auto-pickup-queue",
+          payload: {
+            threadId: "thread-1",
+            autoPickupState: "queued",
+            updatedAt: queuedAt,
+          },
+        }),
+      ),
+    );
+
+    expect(afterQueue.threads[0]?.autoPickupState).toBe("queued");
+    expect(afterQueue.threads[0]?.autoPickedUpAt).toBeNull();
+    expect(afterQueue.threads[0]?.updatedAt).toBe(queuedAt);
+
+    const afterPick = await Effect.runPromise(
+      projectEvent(
+        afterQueue,
+        makeEvent({
+          sequence: 3,
+          type: "thread.auto-pickup-set",
+          aggregateKind: "thread",
+          aggregateId: "thread-1",
+          occurredAt: pickedAt,
+          commandId: "cmd-auto-pickup-pick",
+          payload: {
+            threadId: "thread-1",
+            autoPickupState: "picked",
+            updatedAt: pickedAt,
+          },
+        }),
+      ),
+    );
+
+    expect(afterPick.threads[0]?.autoPickupState).toBe("picked");
+    expect(afterPick.threads[0]?.autoPickedUpAt).toBe(pickedAt);
+    expect(afterPick.threads[0]?.updatedAt).toBe(pickedAt);
+
+    const afterRequeue = await Effect.runPromise(
+      projectEvent(
+        afterPick,
+        makeEvent({
+          sequence: 4,
+          type: "thread.auto-pickup-set",
+          aggregateKind: "thread",
+          aggregateId: "thread-1",
+          occurredAt: requeuedAt,
+          commandId: "cmd-auto-pickup-requeue",
+          payload: {
+            threadId: "thread-1",
+            autoPickupState: "queued",
+            updatedAt: requeuedAt,
+          },
+        }),
+      ),
+    );
+
+    expect(afterRequeue.threads[0]?.autoPickupState).toBe("queued");
+    expect(afterRequeue.threads[0]?.autoPickedUpAt).toBe(pickedAt);
+    expect(afterRequeue.threads[0]?.updatedAt).toBe(requeuedAt);
   });
 
   it("marks assistant messages completed with non-streaming updates", async () => {

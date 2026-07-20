@@ -27,6 +27,8 @@ const baseThread: OrchestrationThread = {
   title: "Test Thread",
   modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
   runtimeMode: "full-access",
+  autoPickupState: null,
+  autoPickedUpAt: null,
   interactionMode: "default",
   branch: null,
   worktreePath: null,

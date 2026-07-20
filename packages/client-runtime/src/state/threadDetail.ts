@@ -50,6 +50,8 @@ export function mergeEnvironmentThread(
     title: shell.title,
     modelSelection: shell.modelSelection,
     runtimeMode: shell.runtimeMode,
+    autoPickupState: shell.autoPickupState,
+    autoPickedUpAt: shell.autoPickedUpAt,
     interactionMode: shell.interactionMode,
     branch: shell.branch,
     worktreePath: shell.worktreePath,

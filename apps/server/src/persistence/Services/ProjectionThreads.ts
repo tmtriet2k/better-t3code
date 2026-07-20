@@ -7,6 +7,7 @@
  * @module ProjectionThreadRepository
  */
 import {
+  AutoPickupState,
   IsoDateTime,
   ModelSelection,
   NonNegativeInt,
@@ -29,6 +30,8 @@ export const ProjectionThread = Schema.Struct({
   title: Schema.String,
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
+  autoPickupState: Schema.NullOr(AutoPickupState),
+  autoPickedUpAt: Schema.NullOr(IsoDateTime),
   interactionMode: ProviderInteractionMode,
   branch: Schema.NullOr(Schema.String),
   worktreePath: Schema.NullOr(Schema.String),
@@ -85,6 +88,17 @@ export interface ProjectionThreadRepositoryShape {
   readonly listByProjectId: (
     input: ListProjectionThreadsByProjectInput,
   ) => Effect.Effect<ReadonlyArray<ProjectionThread>, ProjectionRepositoryError>;
+
+  /**
+   * List projected threads queued for auto-pickup.
+   *
+   * Returns non-archived, non-deleted threads flagged for auto-pickup,
+   * ordered oldest-first.
+   */
+  readonly listQueuedForAutoPickup: () => Effect.Effect<
+    ReadonlyArray<ProjectionThread>,
+    ProjectionRepositoryError
+  >;
 
   /**
    * Soft-delete a projected thread row by id.

@@ -51,6 +51,8 @@ function threadDetailToShell(
     title: thread.title,
     modelSelection: thread.modelSelection,
     runtimeMode: thread.runtimeMode,
+    autoPickupState: thread.autoPickupState,
+    autoPickedUpAt: thread.autoPickedUpAt,
     interactionMode: thread.interactionMode,
     branch: thread.branch,
     worktreePath: thread.worktreePath,

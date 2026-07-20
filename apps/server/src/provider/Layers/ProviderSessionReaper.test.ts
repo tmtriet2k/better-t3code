@@ -95,6 +95,8 @@ function makeReadModel(
       modelSelection: defaultModelSelection,
       interactionMode: "default" as const,
       runtimeMode: "full-access" as const,
+      autoPickupState: null,
+      autoPickedUpAt: null,
       branch: null,
       worktreePath: null,
       createdAt: now,
