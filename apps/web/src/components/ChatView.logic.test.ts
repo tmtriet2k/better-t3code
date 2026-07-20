@@ -13,6 +13,7 @@ import {
   MAX_HIDDEN_MOUNTED_PREVIEW_THREADS,
   MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
   buildExpiredTerminalContextToastCopy,
+  buildSpecRelativePath,
   buildThreadTurnInterruptInput,
   createLocalDispatchSnapshot,
   deriveComposerSendState,
@@ -20,6 +21,7 @@ import {
   hasServerAcknowledgedLocalDispatch,
   reconcileMountedTerminalThreadIds,
   reconcileRetainedMountedThreadIds,
+  resolveNextAutoPickupState,
   resolveSendEnvMode,
   shouldWriteThreadErrorToCurrentServerThread,
 } from "./ChatView.logic";
@@ -40,6 +42,8 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
       model: "gpt-5.4",
     },
     runtimeMode: "full-access",
+    autoPickupState: null,
+    autoPickedUpAt: null,
     interactionMode: "default",
     session: null,
     messages: [],
@@ -98,6 +102,26 @@ describe("buildThreadTurnInterruptInput", () => {
     expect(buildThreadTurnInterruptInput(makeThread({ session: readySession }))).toEqual({
       threadId,
     });
+  });
+});
+
+describe("buildSpecRelativePath", () => {
+  it("scopes the spec file to the thread id", () => {
+    expect(buildSpecRelativePath(threadId)).toBe(`specs/${threadId}.md`);
+  });
+});
+
+describe("resolveNextAutoPickupState", () => {
+  it("queues an idle thread", () => {
+    expect(resolveNextAutoPickupState(null)).toBe("queued");
+  });
+
+  it("queues a picked-up thread again", () => {
+    expect(resolveNextAutoPickupState("picked")).toBe("queued");
+  });
+
+  it("unqueues a queued thread", () => {
+    expect(resolveNextAutoPickupState("queued")).toBe(null);
   });
 });
 

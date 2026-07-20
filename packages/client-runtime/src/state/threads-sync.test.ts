@@ -61,6 +61,8 @@ const BASE_THREAD: OrchestrationThread = {
     model: "gpt-5.4",
   },
   runtimeMode: "full-access",
+  autoPickupState: null,
+  autoPickedUpAt: null,
   interactionMode: "default",
   branch: "main",
   worktreePath: null,

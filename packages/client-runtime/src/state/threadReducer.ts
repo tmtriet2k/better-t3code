@@ -65,6 +65,8 @@ export function applyThreadDetailEvent(
           title: event.payload.title,
           modelSelection: event.payload.modelSelection,
           runtimeMode: event.payload.runtimeMode,
+          autoPickupState: null,
+          autoPickedUpAt: null,
           interactionMode: event.payload.interactionMode,
           branch: event.payload.branch,
           worktreePath: event.payload.worktreePath,
@@ -124,6 +126,19 @@ export function applyThreadDetailEvent(
         thread: {
           ...thread,
           runtimeMode: event.payload.runtimeMode,
+          updatedAt: event.payload.updatedAt,
+        },
+      };
+
+    case "thread.auto-pickup-set":
+      return {
+        kind: "updated",
+        thread: {
+          ...thread,
+          autoPickupState: event.payload.autoPickupState,
+          ...(event.payload.autoPickupState === "picked"
+            ? { autoPickedUpAt: event.payload.updatedAt }
+            : {}),
           updatedAt: event.payload.updatedAt,
         },
       };

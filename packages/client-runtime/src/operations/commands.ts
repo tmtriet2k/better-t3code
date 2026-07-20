@@ -37,6 +37,7 @@ export type ArchiveThreadInput = CommandInput<"thread.archive">;
 export type UnarchiveThreadInput = CommandInput<"thread.unarchive">;
 export type UpdateThreadMetadataInput = CommandInput<"thread.meta.update">;
 export type SetThreadRuntimeModeInput = CommandInput<"thread.runtime-mode.set">;
+export type SetThreadAutoPickupInput = CommandInput<"thread.auto-pickup.set">;
 export type SetThreadInteractionModeInput = CommandInput<"thread.interaction-mode.set">;
 export type StartThreadTurnInput = CommandInput<"thread.turn.start">;
 export type InterruptThreadTurnInput = CommandInput<"thread.turn.interrupt">;
@@ -170,6 +171,18 @@ export const setThreadRuntimeMode: (input: SetThreadRuntimeModeInput) => Command
   return yield* dispatch({
     ...input,
     type: "thread.runtime-mode.set",
+    commandId: metadata.commandId,
+    createdAt: metadata.createdAt,
+  });
+});
+
+export const setThreadAutoPickup: (input: SetThreadAutoPickupInput) => CommandEffect = Effect.fn(
+  "EnvironmentCommands.setThreadAutoPickup",
+)(function* (input) {
+  const metadata = yield* timestampedCommandMetadata(input);
+  return yield* dispatch({
+    ...input,
+    type: "thread.auto-pickup.set",
     commandId: metadata.commandId,
     createdAt: metadata.createdAt,
   });

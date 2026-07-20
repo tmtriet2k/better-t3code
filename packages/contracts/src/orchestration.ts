@@ -121,6 +121,8 @@ export const RuntimeMode = Schema.Literals([
 ]);
 export type RuntimeMode = typeof RuntimeMode.Type;
 export const DEFAULT_RUNTIME_MODE: RuntimeMode = "full-access";
+export const AutoPickupState = Schema.Literals(["queued", "picked"]);
+export type AutoPickupState = typeof AutoPickupState.Type;
 export const ProviderInteractionMode = Schema.Literals(["default", "plan"]);
 export type ProviderInteractionMode = typeof ProviderInteractionMode.Type;
 export const DEFAULT_PROVIDER_INTERACTION_MODE: ProviderInteractionMode = "default";
@@ -347,6 +349,10 @@ export const OrchestrationThread = Schema.Struct({
   title: TrimmedNonEmptyString,
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
+  autoPickupState: Schema.NullOr(AutoPickupState).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+  autoPickedUpAt: Schema.NullOr(IsoDateTime).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   interactionMode: ProviderInteractionMode.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_PROVIDER_INTERACTION_MODE)),
   ),
@@ -393,6 +399,10 @@ export const OrchestrationThreadShell = Schema.Struct({
   title: TrimmedNonEmptyString,
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
+  autoPickupState: Schema.NullOr(AutoPickupState).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+  autoPickedUpAt: Schema.NullOr(IsoDateTime).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   interactionMode: ProviderInteractionMode.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_PROVIDER_INTERACTION_MODE)),
   ),
@@ -564,6 +574,14 @@ const ThreadRuntimeModeSetCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
+const ThreadAutoPickupSetCommand = Schema.Struct({
+  type: Schema.Literal("thread.auto-pickup.set"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  autoPickupState: Schema.NullOr(AutoPickupState),
+  createdAt: IsoDateTime,
+});
+
 const ThreadInteractionModeSetCommand = Schema.Struct({
   type: Schema.Literal("thread.interaction-mode.set"),
   commandId: CommandId,
@@ -689,6 +707,7 @@ const DispatchableClientOrchestrationCommand = Schema.Union([
   ThreadUnarchiveCommand,
   ThreadMetaUpdateCommand,
   ThreadRuntimeModeSetCommand,
+  ThreadAutoPickupSetCommand,
   ThreadInteractionModeSetCommand,
   ThreadTurnStartCommand,
   ThreadTurnInterruptCommand,
@@ -710,6 +729,7 @@ export const ClientOrchestrationCommand = Schema.Union([
   ThreadUnarchiveCommand,
   ThreadMetaUpdateCommand,
   ThreadRuntimeModeSetCommand,
+  ThreadAutoPickupSetCommand,
   ThreadInteractionModeSetCommand,
   ClientThreadTurnStartCommand,
   ThreadTurnInterruptCommand,
@@ -812,6 +832,7 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.unarchived",
   "thread.meta-updated",
   "thread.runtime-mode-set",
+  "thread.auto-pickup-set",
   "thread.interaction-mode-set",
   "thread.message-sent",
   "thread.turn-start-requested",
@@ -901,6 +922,12 @@ export const ThreadMetaUpdatedPayload = Schema.Struct({
 export const ThreadRuntimeModeSetPayload = Schema.Struct({
   threadId: ThreadId,
   runtimeMode: RuntimeMode,
+  updatedAt: IsoDateTime,
+});
+
+export const ThreadAutoPickupSetPayload = Schema.Struct({
+  threadId: ThreadId,
+  autoPickupState: Schema.NullOr(AutoPickupState),
   updatedAt: IsoDateTime,
 });
 
@@ -1065,6 +1092,11 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("thread.runtime-mode-set"),
     payload: ThreadRuntimeModeSetPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.auto-pickup-set"),
+    payload: ThreadAutoPickupSetPayload,
   }),
   Schema.Struct({
     ...EventBaseFields,

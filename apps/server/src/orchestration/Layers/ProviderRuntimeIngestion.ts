@@ -24,9 +24,11 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
 
+import * as AccountRateLimitsStore from "../../provider/AccountRateLimitsStore.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { ProjectionTurnRepository } from "../../persistence/Services/ProjectionTurns.ts";
 import { ProjectionTurnRepositoryLive } from "../../persistence/Layers/ProjectionTurns.ts";
@@ -161,6 +163,31 @@ function maxCheckpointTurnCount(
   }
   return maxTurnCount;
 }
+
+const ClaudeRateLimitInfo = Schema.Struct({
+  status: Schema.Literals(["allowed", "allowed_warning", "rejected"]),
+  resetsAt: Schema.optional(Schema.Number),
+  rateLimitType: Schema.optional(
+    Schema.Literals([
+      "five_hour",
+      "seven_day",
+      "seven_day_opus",
+      "seven_day_sonnet",
+      "seven_day_overage_included",
+      "overage",
+    ]),
+  ),
+  utilization: Schema.optional(Schema.Number),
+});
+
+const ClaudeRateLimitEventPayload = Schema.Struct({
+  rateLimits: Schema.Struct({
+    type: Schema.Literal("rate_limit_event"),
+    rate_limit_info: ClaudeRateLimitInfo,
+  }),
+});
+
+const decodeClaudeRateLimitEventPayload = Schema.decodeUnknownOption(ClaudeRateLimitEventPayload);
 
 function truncateDetail(value: string, limit = 180): string {
   return value.length > limit ? `${value.slice(0, limit - 3)}...` : value;
@@ -634,6 +661,7 @@ const make = Effect.gen(function* () {
   const providerService = yield* ProviderService;
   const projectionTurnRepository = yield* ProjectionTurnRepository;
   const serverSettingsService = yield* ServerSettingsService;
+  const accountRateLimitsStore = yield* AccountRateLimitsStore.AccountRateLimitsStore;
   const providerCommandId = (event: ProviderRuntimeEvent, tag: string) =>
     crypto.randomUUIDv4.pipe(
       Effect.map((uuid) => CommandId.make(`provider:${event.eventId}:${tag}:${uuid}`)),
@@ -1203,8 +1231,34 @@ const make = Effect.gen(function* () {
     },
   );
 
+  const recordAccountRateLimitsSnapshot = Effect.fn("recordAccountRateLimitsSnapshot")(function* (
+    event: Extract<ProviderRuntimeEvent, { type: "account.rate-limits.updated" }>,
+  ) {
+    if (event.provider !== "claudeAgent") {
+      return;
+    }
+    const decoded = decodeClaudeRateLimitEventPayload(event.payload);
+    if (Option.isNone(decoded)) {
+      return;
+    }
+    const rateLimitInfo = decoded.value.rateLimits.rate_limit_info;
+    yield* accountRateLimitsStore.set({
+      provider: event.provider,
+      rateLimitType: rateLimitInfo.rateLimitType ?? null,
+      utilization: rateLimitInfo.utilization ?? null,
+      resetsAt: rateLimitInfo.resetsAt ?? null,
+      status: rateLimitInfo.status,
+      observedAt: event.createdAt,
+    });
+  });
+
   const processRuntimeEvent = (event: ProviderRuntimeEvent) =>
     Effect.gen(function* () {
+      if (event.type === "account.rate-limits.updated") {
+        yield* recordAccountRateLimitsSnapshot(event);
+        return;
+      }
+
       const thread = yield* resolveThreadShell(event.threadId);
       if (!thread) return;
 
@@ -1718,4 +1772,4 @@ const make = Effect.gen(function* () {
 export const ProviderRuntimeIngestionLive = Layer.effect(
   ProviderRuntimeIngestionService,
   make,
-).pipe(Layer.provide(ProjectionTurnRepositoryLive));
+).pipe(Layer.provide(ProjectionTurnRepositoryLive), Layer.provide(AccountRateLimitsStore.layer));

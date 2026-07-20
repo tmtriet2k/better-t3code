@@ -16,6 +16,7 @@ import {
   ProjectMetaUpdatedPayload,
   ThreadActivityAppendedPayload,
   ThreadArchivedPayload,
+  ThreadAutoPickupSetPayload,
   ThreadCreatedPayload,
   ThreadDeletedPayload,
   ThreadInteractionModeSetPayload,
@@ -359,6 +360,18 @@ export function projectEvent(
           ...nextBase,
           threads: updateThread(nextBase.threads, payload.threadId, {
             runtimeMode: payload.runtimeMode,
+            updatedAt: payload.updatedAt,
+          }),
+        })),
+      );
+
+    case "thread.auto-pickup-set":
+      return decodeForEvent(ThreadAutoPickupSetPayload, event.payload, event.type, "payload").pipe(
+        Effect.map((payload) => ({
+          ...nextBase,
+          threads: updateThread(nextBase.threads, payload.threadId, {
+            autoPickupState: payload.autoPickupState,
+            ...(payload.autoPickupState === "picked" ? { autoPickedUpAt: payload.updatedAt } : {}),
             updatedAt: payload.updatedAt,
           }),
         })),

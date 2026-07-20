@@ -140,6 +140,8 @@ describe("OrchestrationEngine", () => {
           },
           interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
           runtimeMode: "full-access" as const,
+          autoPickupState: null,
+          autoPickedUpAt: null,
           branch: null,
           worktreePath: null,
           latestTurn: null,

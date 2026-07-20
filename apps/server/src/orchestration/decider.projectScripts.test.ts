@@ -380,6 +380,84 @@ it.layer(NodeServices.layer)("decider project scripts", (it) => {
     }),
   );
 
+  it.effect("emits thread.auto-pickup-set from thread.auto-pickup.set", () =>
+    Effect.gen(function* () {
+      const now = "2026-01-01T00:00:00.000Z";
+      const initial = createEmptyReadModel(now);
+      const withProject = yield* projectEvent(initial, {
+        sequence: 1,
+        eventId: asEventId("evt-project-create"),
+        aggregateKind: "project",
+        aggregateId: asProjectId("project-1"),
+        type: "project.created",
+        occurredAt: now,
+        commandId: CommandId.make("cmd-project-create"),
+        causationEventId: null,
+        correlationId: CommandId.make("cmd-project-create"),
+        metadata: {},
+        payload: {
+          projectId: asProjectId("project-1"),
+          title: "Project",
+          workspaceRoot: "/tmp/project",
+          defaultModelSelection: null,
+          scripts: [],
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+      const readModel = yield* projectEvent(withProject, {
+        sequence: 2,
+        eventId: asEventId("evt-thread-create"),
+        aggregateKind: "thread",
+        aggregateId: ThreadId.make("thread-1"),
+        type: "thread.created",
+        occurredAt: now,
+        commandId: CommandId.make("cmd-thread-create"),
+        causationEventId: null,
+        correlationId: CommandId.make("cmd-thread-create"),
+        metadata: {},
+        payload: {
+          threadId: ThreadId.make("thread-1"),
+          projectId: asProjectId("project-1"),
+          title: "Thread",
+          modelSelection: {
+            instanceId: ProviderInstanceId.make("codex"),
+            model: "gpt-5-codex",
+          },
+          interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+          runtimeMode: "full-access",
+          branch: null,
+          worktreePath: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      const result = yield* decideOrchestrationCommand({
+        command: {
+          type: "thread.auto-pickup.set",
+          commandId: CommandId.make("cmd-auto-pickup-set"),
+          threadId: ThreadId.make("thread-1"),
+          autoPickupState: "queued",
+          createdAt: now,
+        },
+        readModel,
+      });
+
+      const singleResult = Array.isArray(result) ? null : result;
+      if (singleResult === null) {
+        throw new Error("Expected a single auto-pickup-set event.");
+      }
+      expect(singleResult).toMatchObject({
+        type: "thread.auto-pickup-set",
+        payload: {
+          threadId: ThreadId.make("thread-1"),
+          autoPickupState: "queued",
+        },
+      });
+    }),
+  );
+
   it.effect("emits thread.interaction-mode-set from thread.interaction-mode.set", () =>
     Effect.gen(function* () {
       const now = "2026-01-01T00:00:00.000Z";
